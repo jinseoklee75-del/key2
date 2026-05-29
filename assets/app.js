@@ -1,0 +1,1034 @@
+const defs = [
+      { name: '교육 실시율', desc: '계획 대비 실제 운영 비율. 교육과정 운영 실행력을 확인하는 지표입니다.' },
+      { name: '교육 참석율', desc: '신청 대비 실제 참석 비율. 교육과정 참여 집중도를 확인합니다.' },
+      { name: '교육만족도', desc: '교육 내용과 운영 만족도를 5점 척도로 관리합니다.' },
+      { name: '강사 만족도', desc: '강의 전달력과 전문성에 대한 만족도를 5점 척도로 관리합니다.' },
+      { name: '실무적용체감도', desc: '교육 후 현업에서 실제 활용 가능하다고 느끼는 수준을 5점 척도로 측정합니다.' },
+      { name: '역량개발비 사용율', desc: '역량개발비 사용액 / 총예산. 예산 집행 수준을 관리합니다.' },
+      { name: '집합교육 참여율', desc: '집합교육 수강인원 / 총인원. 오프라인 학습 참여 수준을 관리합니다.' },
+      { name: '온라인교육 참여율', desc: '온라인교육 수강인원 / 총인원. 상시학습 활성화 수준을 확인합니다.' },
+      { name: '디지털 교육 참여율', desc: '디지털교육 수강인원 / 총인원. 조직의 디지털 학습 참여도를 보여줍니다.' },
+      { name: '생성형AI 활용인원율', desc: '생성형AI 활용 인원 / 총인원. 조직 내 생성형AI 활용 확산 수준을 확인합니다.' },
+      { name: '생성형AI 사용금액율', desc: '생성형AI 실 사용액 / 조직·개인역량개발비 예산. 예산 대비 실제 사용금액 비중을 관리합니다.' },
+      { name: '디지털리더 양성율', desc: '디지털리더 수 / 총인원. DX/AX 추진 인재 기반 수준을 보여줍니다.' },
+      { name: '혁신활동수', desc: '혁신활동 실행 건수를 월별로 관리하는 지표입니다. 연간 대시보드에서는 누적 건수로 표시합니다.' }
+    ];
+
+    const logicNotesData = [
+      { title: '교육과정 집계', text: '운영효율과 교육품질을 교육과정 기준으로 통합 집계합니다. 같은 월에 여러 과정이 있어도 계획·실행·신청·참석·응답 데이터를 합산 또는 가중평균하여 월 KPI를 계산합니다.' },
+      { title: '학습참여 집계', text: '월별 총인원 대비 집합/온라인 수강인원 비율을 계산하고, 연간 값은 월평균 기준으로 보여줍니다.' },
+      { title: 'DX/AX 집계', text: '디지털교육 참여율, 생성형AI 활용인원율, 디지털리더 양성율은 총인원 대비 비율로 계산합니다. 생성형AI 사용금액율은 조직/개인역량개발비 예산 대비 생성형AI 실 사용액 기준으로 계산합니다.' },
+      { title: '혁신활동 집계', text: '혁신활동수는 월별 입력값을 기준으로 관리하며, 연간 대시보드에서는 누적 건수로 표시합니다.' },
+      { title: '목표관리 입력', text: '엑셀형 목표관리 시트에서 연도별 목표값을 직접 입력하면 우선 관리 포인트와 목표 달성률이 자동 반영됩니다.' }
+    ];
+
+    const dashboardModeText = {
+      all: '전체 핵심지표 보기',
+      course: '교육과정 핵심지표 보기',
+      learning: '학습참여 핵심지표 보기',
+      dx: 'DX/AX 핵심지표 보기',
+      innovation: '혁신활동 핵심지표 보기'
+    };
+
+    const sheetConfig = {
+      course: {
+        title: '교육과정',
+        note: '운영효율과 교육품질을 교육과정 기준으로 통합 입력합니다. 계획/실행/참석 정보와 만족도 정보를 한 행에서 함께 관리합니다.',
+        columns: [
+          {key:'year', label:'연도', type:'number', editable:true, align:'center'},
+          {key:'month', label:'월', type:'number', editable:true, align:'center'},
+          {key:'course', label:'교육명', type:'text', editable:true, align:'left'},
+          {key:'planned', label:'계획 횟수', type:'number', editable:true, align:'center'},
+          {key:'actual', label:'실제 운영 횟수', type:'number', editable:true, align:'center'},
+          {key:'applicants', label:'신청 인원', type:'number', editable:true, align:'center'},
+          {key:'attendees', label:'실제 참석 인원', type:'number', editable:true, align:'center'},
+          {key:'respondents', label:'응답자수', type:'number', editable:true, align:'center'},
+          {key:'satisfaction', label:'교육만족도', type:'score', editable:true, align:'center'},
+          {key:'instructor', label:'강사 만족도', type:'score', editable:true, align:'center'},
+          {key:'practical', label:'실무적용체감도', type:'score', editable:true, align:'center'},
+          {key:'operationRate', label:'교육 실시율', type:'calc-percent', editable:false, align:'center'},
+          {key:'attendanceRate', label:'교육 참석율', type:'calc-percent', editable:false, align:'center'}
+        ]
+      },
+      learning: {
+        title: '학습참여',
+        note: '총인원, 예산, 사용액, 집합/온라인 교육 수강인원을 입력하면 참여율이 자동 계산됩니다.',
+        columns: [
+          {key:'year', label:'연도', type:'number', editable:true, align:'center'},
+          {key:'month', label:'월', type:'number', editable:true, align:'center'},
+          {key:'total', label:'총인원', type:'number', editable:true, align:'center'},
+          {key:'budget', label:'역량개발비 총예산', type:'number', editable:true, align:'center'},
+          {key:'used', label:'역량개발비 사용액', type:'number', editable:true, align:'center'},
+          {key:'offline', label:'집합교육 수강인원', type:'number', editable:true, align:'center'},
+          {key:'online', label:'온라인교육 수강인원', type:'number', editable:true, align:'center'},
+          {key:'budgetUseRate', label:'역량개발비 사용율', type:'calc-percent', editable:false, align:'center'},
+          {key:'offlineRate', label:'집합교육 참여율', type:'calc-percent', editable:false, align:'center'},
+          {key:'onlineRate', label:'온라인교육 참여율', type:'calc-percent', editable:false, align:'center'}
+        ]
+      },
+      dx: {
+        title: 'DX/AX',
+        note: '생성형AI 지표는 활용인원 비율과 사용금액 비율로 분리됩니다. 사용금액율은 조직/개인역량개발비 예산 대비 생성형AI 실 사용액 기준입니다.',
+        columns: [
+          {key:'year', label:'연도', type:'number', editable:true, align:'center'},
+          {key:'month', label:'월', type:'number', editable:true, align:'center'},
+          {key:'total', label:'총인원', type:'number', editable:true, align:'center'},
+          {key:'digital', label:'디지털교육 수강인원', type:'number', editable:true, align:'center'},
+          {key:'genaiUsers', label:'생성형AI 활용 인원', type:'number', editable:true, align:'center'},
+          {key:'devBudget', label:'조직/개인역량개발비 예산', type:'number', editable:true, align:'center'},
+          {key:'genaiSpend', label:'생성형AI 실 사용액', type:'number', editable:true, align:'center'},
+          {key:'leaders', label:'디지털리더 수', type:'number', editable:true, align:'center'},
+          {key:'digitalRate', label:'디지털 교육 참여율', type:'calc-percent', editable:false, align:'center'},
+          {key:'genaiHeadcountRate', label:'생성형AI 활용인원율', type:'calc-percent', editable:false, align:'center'},
+          {key:'genaiSpendRate', label:'생성형AI 사용금액율', type:'calc-percent', editable:false, align:'center'},
+          {key:'leaderRate', label:'디지털리더 양성율', type:'calc-percent', editable:false, align:'center'}
+        ]
+      },
+      innovation: {
+        title: '혁신활동',
+        note: '월별 혁신활동 실행 건수를 직접 입력하세요. 대시보드에서는 연간 누적 건수와 월별 추이를 별도 표시합니다.',
+        columns: [
+          {key:'year', label:'연도', type:'number', editable:true, align:'center'},
+          {key:'month', label:'월', type:'number', editable:true, align:'center'},
+          {key:'activity', label:'활동명', type:'text', editable:true, align:'left'},
+          {key:'innovation', label:'혁신활동수', type:'number', editable:true, align:'center'}
+        ]
+      },
+      targets: {
+        title: '목표관리',
+        note: '연도별 핵심지표 목표값을 직접 입력하세요. 지표명은 드롭다운에서 선택할 수 있고, 선택한 지표에 따라 단위가 자동 반영됩니다.',
+        columns: [
+          {key:'year', label:'연도', type:'number', editable:true, align:'center'},
+          {key:'category', label:'구분', type:'text', editable:true, align:'left'},
+          {key:'kpi', label:'지표명', type:'text', editable:true, align:'left'},
+          {key:'unit', label:'단위', type:'text', editable:true, align:'center'},
+          {key:'target', label:'목표값', type:'number', editable:true, align:'center'}
+        ]
+      }
+    };
+
+    const excelSheetAliases = {
+      course: ['입력_교육과정', '교육과정'],
+      learning: ['입력_학습참여', '학습참여'],
+      dx: ['입력_DX_AX', '입력_DX/AX', 'DX/AX'],
+      innovation: ['입력_혁신활동', '혁신활동'],
+      targets: ['목표관리', '입력_목표관리']
+    };
+
+    function initialData() {
+      return {
+        course: [],
+        learning: [],
+        dx: [],
+        innovation: [],
+        targets: []
+      };
+    }
+
+    const targetKpiOptions = {
+      '교육과정': [
+        { kpi:'교육 실시율', unit:'%' },
+        { kpi:'교육 참석율', unit:'%' },
+        { kpi:'교육만족도', unit:'점' },
+        { kpi:'강사 만족도', unit:'점' },
+        { kpi:'실무적용체감도', unit:'점' }
+      ],
+      '학습참여': [
+        { kpi:'역량개발비 사용율', unit:'%' },
+        { kpi:'집합교육 참여율', unit:'%' },
+        { kpi:'온라인교육 참여율', unit:'%' }
+      ],
+      'DX/AX': [
+        { kpi:'디지털 교육 참여율', unit:'%' },
+        { kpi:'생성형AI 활용인원율', unit:'%' },
+        { kpi:'생성형AI 사용금액율', unit:'%' },
+        { kpi:'디지털리더 양성율', unit:'%' }
+      ],
+      '혁신활동': [
+        { kpi:'혁신활동수', unit:'건' }
+      ]
+    };
+
+    function getTargetCategoryOptions() {
+      return Object.keys(targetKpiOptions);
+    }
+
+    function getTargetKpiList(category) {
+      return targetKpiOptions[category] || [];
+    }
+
+    function syncTargetRow(row) {
+      const categories = getTargetCategoryOptions();
+      if (!categories.includes(row.category)) row.category = categories[0] || '';
+      const kpis = getTargetKpiList(row.category);
+      const found = kpis.find(item => item.kpi === row.kpi);
+      if (!found) {
+        row.kpi = kpis[0] ? kpis[0].kpi : '';
+        row.unit = kpis[0] ? kpis[0].unit : '';
+      } else {
+        row.unit = found.unit;
+      }
+      return row;
+    }
+
+    const metricCatalog = {
+      operationRate: {label:'교육 실시율', category:'교육과정', tone:'blue', type:'percent', note:'계획 대비 실제 운영'},
+      attendanceRate: {label:'교육 참석율', category:'교육과정', tone:'teal', type:'percent', note:'신청 대비 실제 참석'},
+      satisfaction: {label:'교육만족도', category:'교육과정', tone:'green', type:'score', note:'응답자 가중평균'},
+      instructor: {label:'강사 만족도', category:'교육과정', tone:'green', type:'score', note:'응답자 가중평균'},
+      practical: {label:'실무적용체감도', category:'교육과정', tone:'orange', type:'score', note:'응답자 가중평균'},
+      budgetUseRate: {label:'역량개발비 사용율', category:'학습참여', tone:'teal', type:'percent', note:'월 평균 사용율'},
+      offlineRate: {label:'집합교육 참여율', category:'학습참여', tone:'blue', type:'percent', note:'월 평균 참여율'},
+      onlineRate: {label:'온라인교육 참여율', category:'학습참여', tone:'teal', type:'percent', note:'월 평균 참여율'},
+      digitalRate: {label:'디지털 교육 참여율', category:'DX/AX', tone:'blue', type:'percent', note:'월 평균 참여율'},
+      genaiHeadcountRate: {label:'생성형AI 활용인원율', category:'DX/AX', tone:'orange', type:'percent', note:'월 평균 활용인원 비율'},
+      genaiSpendRate: {label:'생성형AI 사용금액율', category:'DX/AX', tone:'teal', type:'percent', note:'예산 대비 실사용액 비율'},
+      leaderRate: {label:'디지털리더 양성율', category:'DX/AX', tone:'green', type:'percent', note:'월 평균 양성율'},
+      innovationTotal: {label:'혁신활동수', category:'혁신활동', tone:'purple', type:'count', note:'연간 누적 건수'}
+    };
+
+    const dashboardMetricGroups = {
+      course: ['operationRate', 'attendanceRate', 'satisfaction', 'instructor', 'practical'],
+      learning: ['budgetUseRate', 'offlineRate', 'onlineRate'],
+      dx: ['digitalRate', 'genaiHeadcountRate', 'genaiSpendRate', 'leaderRate'],
+      innovation: ['innovationTotal']
+    };
+
+    function createEmptySelections() {
+      return { course: [], learning: [], dx: [], innovation: [], targets: [] };
+    }
+
+    const STORAGE_KEY = 'ld_center_kpi_dashboard_v11';
+
+    let state = {
+      data: initialData(),
+      currentYear: 2026,
+      currentView: 'dashboard',
+      currentSheet: 'course',
+      currentDashboardTab: 'all',
+      selectedRows: createEmptySelections()
+    };
+
+    function persistState() {
+      try {
+        const payload = {
+          data: state.data,
+          currentYear: state.currentYear,
+          currentView: state.currentView,
+          currentSheet: state.currentSheet,
+          currentDashboardTab: state.currentDashboardTab
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (err) {
+        console.warn('local save failed', err);
+      }
+    }
+
+    function loadPersistedState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        const base = initialData();
+        const data = saved && saved.data ? saved.data : {};
+        Object.keys(base).forEach(key => {
+          base[key] = Array.isArray(data[key]) ? data[key] : [];
+        });
+        state.data = base;
+        if (saved.currentYear) state.currentYear = Number(saved.currentYear) || state.currentYear;
+        if (saved.currentView) state.currentView = saved.currentView;
+        if (saved.currentSheet && sheetConfig[saved.currentSheet]) state.currentSheet = saved.currentSheet;
+        if (saved.currentDashboardTab && (saved.currentDashboardTab === 'all' || dashboardMetricGroups[saved.currentDashboardTab])) {
+          state.currentDashboardTab = saved.currentDashboardTab;
+        }
+      } catch (err) {
+        console.warn('local load failed', err);
+      }
+    }
+
+    const yearSelect = document.getElementById('yearSelect');
+
+    const kpiGrid = document.getElementById('kpiGrid');
+    const lineSvg = document.getElementById('lineSvg');
+    const barChart = document.getElementById('barChart');
+    const definitionList = document.getElementById('definitionList');
+    const priorityBody = document.getElementById('priorityBody');
+    const gaugeList = document.getElementById('gaugeList');
+    const logicNotes = document.getElementById('logicNotes');
+    const sheetPanels = document.getElementById('sheetPanels');
+    const sheetNote = document.getElementById('sheetNote');
+    const excelFileInput = document.getElementById('excelFileInput');
+
+    function n(v) {
+      if (v === null || v === undefined || v === '') return 0;
+      const num = Number(String(v).replace(/,/g, '').trim());
+      return isNaN(num) ? 0 : num;
+    }
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function divide(a, b) { return b ? a / b : 0; }
+    function percent(v) { return `${(v || 0).toFixed(1)}%`; }
+    function score(v) { return `${(v || 0).toFixed(1)}점`; }
+    function countText(v) { return `${Math.round(v || 0)}건`; }
+    function avg(arr) { const f = arr.filter(v => !isNaN(v)); return f.length ? f.reduce((a,b)=>a+b,0)/f.length : 0; }
+    function weighted(items, key, weight='respondents') {
+      let total = 0, w = 0;
+      items.forEach(it => {
+        const val = n(it[key]);
+        const ww = n(it[weight]);
+        if (ww > 0) { total += val * ww; w += ww; }
+      });
+      return w ? total / w : avg(items.map(it => n(it[key])));
+    }
+    function formatMetricValue(metricKey, value) {
+      const cfg = metricCatalog[metricKey];
+      if (!cfg) return String(value || '');
+      if (cfg.type === 'percent') return percent(value);
+      if (cfg.type === 'score') return score(value);
+      return countText(value);
+    }
+    function getYears() {
+      const years = new Set();
+      Object.values(state.data).forEach(arr => arr.forEach(row => years.add(n(row.year))));
+      return Array.from(years).filter(Boolean).sort((a,b) => b-a);
+    }
+    function getMetricKeysByTab(tab) {
+      if (tab === 'all') return [...dashboardMetricGroups.course, ...dashboardMetricGroups.learning, ...dashboardMetricGroups.dx, ...dashboardMetricGroups.innovation];
+      return dashboardMetricGroups[tab] || [];
+    }
+    function getTargetMap(year) {
+      const map = {};
+      (state.data.targets || []).filter(r => n(r.year) === year).forEach(r => { map[r.kpi] = r; });
+      return map;
+    }
+
+    function calcRow(type, row) {
+      if (type === 'course') {
+        row.operationRate = divide(n(row.actual), n(row.planned)) * 100;
+        row.attendanceRate = divide(n(row.attendees), n(row.applicants)) * 100;
+        row.satisfaction = clamp(n(row.satisfaction), 0, 5);
+        row.instructor = clamp(n(row.instructor), 0, 5);
+        row.practical = clamp(n(row.practical), 0, 5);
+      }
+      if (type === 'learning') {
+        row.budgetUseRate = divide(n(row.used), n(row.budget)) * 100;
+        row.offlineRate = divide(n(row.offline), n(row.total)) * 100;
+        row.onlineRate = divide(n(row.online), n(row.total)) * 100;
+      }
+      if (type === 'dx') {
+        row.digitalRate = divide(n(row.digital), n(row.total)) * 100;
+        row.genaiHeadcountRate = divide(n(row.genaiUsers), n(row.total)) * 100;
+        row.genaiSpendRate = divide(n(row.genaiSpend), n(row.devBudget)) * 100;
+        row.leaderRate = divide(n(row.leaders), n(row.total)) * 100;
+      }
+      if (type === 'innovation') {
+        row.innovation = n(row.innovation);
+      }
+      if (type === 'targets') {
+        syncTargetRow(row);
+        row.target = n(row.target);
+      }
+      return row;
+    }
+
+    function prepareAllRows() {
+      Object.keys(state.data).forEach(type => state.data[type].forEach(row => calcRow(type, row)));
+    }
+
+    function byMonth(type, year) {
+      const base = Array.from({length:12}, (_,i) => ({month:i+1}));
+      const rows = state.data[type].filter(r => n(r.year) === year);
+      return base.map(m => {
+        const list = rows.filter(r => n(r.month) === m.month);
+        if (type === 'course') {
+          const planned = list.reduce((s,r)=>s+n(r.planned),0);
+          const actual = list.reduce((s,r)=>s+n(r.actual),0);
+          const applicants = list.reduce((s,r)=>s+n(r.applicants),0);
+          const attendees = list.reduce((s,r)=>s+n(r.attendees),0);
+          const respondents = list.reduce((s,r)=>s+n(r.respondents),0);
+          return {
+            month:m.month,
+            planned,
+            actual,
+            applicants,
+            attendees,
+            respondents,
+            operationRate: divide(actual, planned)*100,
+            attendanceRate: divide(attendees, applicants)*100,
+            satisfaction: weighted(list, 'satisfaction'),
+            instructor: weighted(list, 'instructor'),
+            practical: weighted(list, 'practical')
+          };
+        }
+        if (type === 'learning') {
+          const total = list.reduce((s,r)=>s+n(r.total),0);
+          const budget = list.reduce((s,r)=>s+n(r.budget),0);
+          const used = list.reduce((s,r)=>s+n(r.used),0);
+          const offline = list.reduce((s,r)=>s+n(r.offline),0);
+          const online = list.reduce((s,r)=>s+n(r.online),0);
+          return {month:m.month, total, budget, used, offline, online, budgetUseRate: divide(used, budget)*100, offlineRate: divide(offline, total)*100, onlineRate: divide(online, total)*100};
+        }
+        if (type === 'innovation') {
+          const innovation = list.reduce((s,r)=>s+n(r.innovation),0);
+          return {month:m.month, innovation};
+        }
+        const total = list.reduce((s,r)=>s+n(r.total),0);
+        const digital = list.reduce((s,r)=>s+n(r.digital),0);
+        const genaiUsers = list.reduce((s,r)=>s+n(r.genaiUsers),0);
+        const devBudget = list.reduce((s,r)=>s+n(r.devBudget),0);
+        const genaiSpend = list.reduce((s,r)=>s+n(r.genaiSpend),0);
+        const leaders = list.reduce((s,r)=>s+n(r.leaders),0);
+        return {
+          month:m.month,
+          total,
+          digital,
+          genaiUsers,
+          devBudget,
+          genaiSpend,
+          leaders,
+          digitalRate: divide(digital, total)*100,
+          genaiHeadcountRate: divide(genaiUsers, total)*100,
+          genaiSpendRate: divide(genaiSpend, devBudget)*100,
+          leaderRate: divide(leaders, total)*100
+        };
+      });
+    }
+
+    function annual(year) {
+      const course = state.data.course.filter(r => n(r.year) === year);
+      const innovation = state.data.innovation.filter(r => n(r.year) === year);
+      const courseMonths = byMonth('course', year);
+      const learningMonths = byMonth('learning', year);
+      const dxMonths = byMonth('dx', year);
+      const innovationMonths = byMonth('innovation', year);
+      const planned = course.reduce((s,r)=>s+n(r.planned),0);
+      const actual = course.reduce((s,r)=>s+n(r.actual),0);
+      const applicants = course.reduce((s,r)=>s+n(r.applicants),0);
+      const attendees = course.reduce((s,r)=>s+n(r.attendees),0);
+      return {
+        operationRate: divide(actual, planned)*100,
+        attendanceRate: divide(attendees, applicants)*100,
+        satisfaction: weighted(course, 'satisfaction'),
+        instructor: weighted(course, 'instructor'),
+        practical: weighted(course, 'practical'),
+        budgetUseRate: avg(learningMonths.map(v => v.budgetUseRate).filter(v => v>0)),
+        offlineRate: avg(learningMonths.map(v => v.offlineRate).filter(v => v>0)),
+        onlineRate: avg(learningMonths.map(v => v.onlineRate).filter(v => v>0)),
+        digitalRate: avg(dxMonths.map(v => v.digitalRate).filter(v => v>0)),
+        genaiHeadcountRate: avg(dxMonths.map(v => v.genaiHeadcountRate).filter(v => v>0)),
+        genaiSpendRate: avg(dxMonths.map(v => v.genaiSpendRate).filter(v => v>0)),
+        leaderRate: avg(dxMonths.map(v => v.leaderRate).filter(v => v>0)),
+        innovationTotal: innovationMonths.reduce((s,r)=>s+n(r.innovation),0)
+      };
+    }
+
+    function renderYearOptions() {
+      const years = getYears();
+      if (!years.includes(state.currentYear)) state.currentYear = years[0] || new Date().getFullYear();
+      yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}년</option>`).join('');
+      yearSelect.value = state.currentYear;
+    }
+
+    function renderKpis() {
+      const a = annual(state.currentYear);
+      const items = getMetricKeysByTab(state.currentDashboardTab).map(key => ({ key, ...metricCatalog[key], value: a[key] || 0 }));
+      kpiGrid.innerHTML = items.map(item => `
+        <div class="card kpi">
+          <div class="top"><div class="title">${item.label}</div><div class="pill ${item.tone}">${item.category}</div></div>
+          <div class="value">${formatMetricValue(item.key, item.value)}</div>
+          <div class="sub">${item.note}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderDefinitions() {
+      const defFilter = {
+        all: defs,
+        course: defs.filter(d => ['교육 실시율','교육 참석율','교육만족도','강사 만족도','실무적용체감도'].includes(d.name)),
+        learning: defs.filter(d => ['역량개발비 사용율','집합교육 참여율','온라인교육 참여율'].includes(d.name)),
+        dx: defs.filter(d => ['디지털 교육 참여율','생성형AI 활용인원율','생성형AI 사용금액율','디지털리더 양성율'].includes(d.name)),
+        innovation: defs.filter(d => ['혁신활동수'].includes(d.name))
+      };
+      const noteFilter = {
+        all: logicNotesData,
+        course: logicNotesData.filter(d => d.title === '교육과정 집계'),
+        learning: logicNotesData.filter(d => d.title === '학습참여 집계'),
+        dx: logicNotesData.filter(d => d.title === 'DX/AX 집계'),
+        innovation: logicNotesData.filter(d => d.title === '혁신활동 집계'),
+      };
+      const targetNote = logicNotesData.find(d => d.title === '목표관리 입력');
+      definitionList.innerHTML = (defFilter[state.currentDashboardTab] || defs).map(d => `<div class="insight"><h4>${d.name}</h4><p>${d.desc}</p></div>`).join('');
+      const baseNotes = (noteFilter[state.currentDashboardTab] || logicNotesData);
+      const finalNotes = state.currentDashboardTab === 'all' ? baseNotes : [...baseNotes, ...(targetNote ? [targetNote] : [])];
+      logicNotes.innerHTML = finalNotes.map(d => `<div class="insight"><h4>${d.title}</h4><p>${d.text}</p></div>`).join('');
+    }
+
+    function lineLegend(series, target) {
+      target.innerHTML = series.map(s => `<span><i style="background:${s.color}"></i>${s.name}</span>`).join('');
+    }
+
+    function drawLine(series, maxValue, unit) {
+      const w = 780, h = 320, px = 48, py = 24, pb = 34;
+      const innerW = w - px - 16;
+      const innerH = h - py - pb;
+      let svg = '';
+      for (let i=0; i<=4; i++) {
+        const y = py + (innerH/4)*i;
+        const labelVal = maxValue - (maxValue/4)*i;
+        svg += `<line x1="${px}" y1="${y}" x2="${w-16}" y2="${y}" stroke="#e7edf6" stroke-width="1" />`;
+        svg += `<text x="6" y="${y+4}" fill="#7a869f" font-size="11">${labelVal.toFixed(unit==='점'?1:0)}${unit}</text>`;
+      }
+      for (let i=0; i<12; i++) {
+        const x = px + (innerW/11)*i;
+        svg += `<text x="${x}" y="${h-10}" text-anchor="middle" fill="#7a869f" font-size="11">${i+1}</text>`;
+      }
+      series.forEach(s => {
+        const points = s.values.map((v, i) => {
+          const x = px + (innerW/11)*i;
+          const y = py + innerH - (Math.min(v, maxValue)/maxValue)*innerH;
+          return `${x},${y}`;
+        }).join(' ');
+        svg += `<polyline fill="none" stroke="${s.color}" stroke-width="3" points="${points}" />`;
+        s.values.forEach((v, i) => {
+          const x = px + (innerW/11)*i;
+          const y = py + innerH - (Math.min(v, maxValue)/maxValue)*innerH;
+          svg += `<circle cx="${x}" cy="${y}" r="4" fill="${s.color}" />`;
+        });
+      });
+      lineSvg.innerHTML = svg;
+    }
+
+    function drawBars(series, maxValue, unit) {
+      barChart.innerHTML = '';
+      for (let i=0; i<12; i++) {
+        const group = document.createElement('div');
+        group.className = 'bar-group';
+        const stack = document.createElement('div');
+        stack.className = 'bar-stack';
+        series.forEach(s => {
+          const bar = document.createElement('div');
+          bar.className = 'bar';
+          bar.style.background = s.color;
+          bar.style.height = `${Math.max((Math.min(s.values[i], maxValue)/maxValue)*200, 6)}px`;
+          bar.title = `${s.name}: ${unit === '점' ? s.values[i].toFixed(1) : Math.round(s.values[i] * 10) / 10}${unit}`;
+          stack.appendChild(bar);
+        });
+        const label = document.createElement('div');
+        label.className = 'bar-label';
+        label.textContent = i + 1;
+        group.appendChild(stack);
+        group.appendChild(label);
+        barChart.appendChild(group);
+      }
+    }
+
+    function renderCharts() {
+      const course = byMonth('course', state.currentYear);
+      const le = byMonth('learning', state.currentYear);
+      const dx = byMonth('dx', state.currentYear);
+      const innovation = byMonth('innovation', state.currentYear);
+      const mainLegend = document.getElementById('mainLegend');
+      const compareLegend = document.getElementById('compareLegend');
+      const mainChartTitle = document.getElementById('mainChartTitle');
+      const compareTitle = document.getElementById('compareTitle');
+      const mainChartSub = document.getElementById('mainChartSub');
+      const compareSub = document.getElementById('compareSub');
+      const modeChip = document.getElementById('dashboardModeChip');
+      const niceMax = (series, fallback=100) => {
+        const raw = Math.max(0, ...series.flatMap(s => s.values || []));
+        if (!raw) return fallback;
+        if (raw <= 5) return 5;
+        const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+        return Math.ceil((raw * 1.15) / mag) * mag;
+      };
+
+      let lineSeries = [];
+      let barSeries = [];
+      let lineMax = 100;
+      let lineUnit = '%';
+      let barMax = 5;
+      let barUnit = '점';
+
+      if (state.currentDashboardTab === 'course') {
+        lineSeries = [
+          {name:'교육 실시율', color:'#2f6fed', values:course.map(v => v.operationRate || 0)},
+          {name:'교육 참석율', color:'#16b3c6', values:course.map(v => v.attendanceRate || 0)}
+        ];
+        barSeries = [
+          {name:'교육만족도', color:'#22a06b', values:course.map(v => v.satisfaction || 0)},
+          {name:'강사 만족도', color:'#2f6fed', values:course.map(v => v.instructor || 0)},
+          {name:'실무적용체감도', color:'#f59e0b', values:course.map(v => v.practical || 0)}
+        ];
+        lineMax = 100;
+        lineUnit = '%';
+        barMax = 5;
+        barUnit = '점';
+        mainChartTitle.textContent = '교육과정 운영 추이';
+        mainChartSub.textContent = `${state.currentYear}년 교육과정 월별 운영 변화`;
+        compareTitle.textContent = '교육과정 품질지표 비교';
+        compareSub.textContent = '월별 만족도·강사·실무적용체감도';
+      } else if (state.currentDashboardTab === 'learning') {
+        lineSeries = [
+          {name:'역량개발비 사용율', color:'#22a06b', values:le.map(v => v.budgetUseRate || 0)},
+          {name:'집합교육 참여율', color:'#2f6fed', values:le.map(v => v.offlineRate || 0)},
+          {name:'온라인교육 참여율', color:'#16b3c6', values:le.map(v => v.onlineRate || 0)}
+        ];
+        barSeries = [
+          {name:'집합교육 수강인원', color:'#2f6fed', values:le.map(v => v.offline || 0)},
+          {name:'온라인교육 수강인원', color:'#16b3c6', values:le.map(v => v.online || 0)}
+        ];
+        barMax = niceMax(barSeries, 100);
+        barUnit = '명';
+        mainChartTitle.textContent = '학습참여 추이';
+        mainChartSub.textContent = `${state.currentYear}년 참여 및 예산 활용 추이`;
+        compareTitle.textContent = '집합교육 vs 온라인교육 수강인원';
+        compareSub.textContent = '월별 참여 인원 비교';
+      } else if (state.currentDashboardTab === 'dx') {
+        lineSeries = [
+          {name:'디지털 교육 참여율', color:'#2f6fed', values:dx.map(v => v.digitalRate || 0)},
+          {name:'생성형AI 활용인원율', color:'#f59e0b', values:dx.map(v => v.genaiHeadcountRate || 0)},
+          {name:'생성형AI 사용금액율', color:'#16b3c6', values:dx.map(v => v.genaiSpendRate || 0)},
+          {name:'디지털리더 양성율', color:'#22a06b', values:dx.map(v => v.leaderRate || 0)}
+        ];
+        barSeries = [
+          {name:'디지털교육 수강인원', color:'#2f6fed', values:dx.map(v => v.digital || 0)},
+          {name:'생성형AI 활용 인원', color:'#f59e0b', values:dx.map(v => v.genaiUsers || 0)},
+          {name:'디지털리더 수', color:'#22a06b', values:dx.map(v => v.leaders || 0)}
+        ];
+        barMax = niceMax(barSeries, 50);
+        barUnit = '명';
+        mainChartTitle.textContent = 'DX/AX 추이';
+        mainChartSub.textContent = `${state.currentYear}년 DX/AX 월별 변화`;
+        compareTitle.textContent = 'DX/AX 인원지표 비교';
+        compareSub.textContent = '디지털교육 / 생성형AI 활용 / 디지털리더';
+      } else if (state.currentDashboardTab === 'innovation') {
+        lineSeries = [
+          {name:'혁신활동수', color:'#8b5cf6', values:innovation.map(v => v.innovation || 0)}
+        ];
+        barSeries = [
+          {name:'혁신활동수', color:'#8b5cf6', values:innovation.map(v => v.innovation || 0)}
+        ];
+        lineMax = niceMax(lineSeries, 10);
+        lineUnit = '건';
+        barMax = niceMax(barSeries, 10);
+        barUnit = '건';
+        mainChartTitle.textContent = '혁신활동 추이';
+        mainChartSub.textContent = `${state.currentYear}년 혁신활동 월별 변화`;
+        compareTitle.textContent = '월별 혁신활동수';
+        compareSub.textContent = '혁신활동 실행 건수 비교';
+      } else {
+        lineSeries = [
+          {name:'교육 실시율', color:'#2f6fed', values:course.map(v => v.operationRate || 0)},
+          {name:'온라인교육 참여율', color:'#16b3c6', values:le.map(v => v.onlineRate || 0)},
+          {name:'생성형AI 활용인원율', color:'#f59e0b', values:dx.map(v => v.genaiHeadcountRate || 0)}
+        ];
+        barSeries = [
+          {name:'교육만족도', color:'#22a06b', values:course.map(v => v.satisfaction || 0)},
+          {name:'강사 만족도', color:'#2f6fed', values:course.map(v => v.instructor || 0)},
+          {name:'실무적용체감도', color:'#f59e0b', values:course.map(v => v.practical || 0)}
+        ];
+        lineMax = 100;
+        lineUnit = '%';
+        barMax = 5;
+        barUnit = '점';
+        mainChartTitle.textContent = '전체 대표 KPI 추이';
+        mainChartSub.textContent = `${state.currentYear}년 기준 대표지표 월별 변화`;
+        compareTitle.textContent = '전체 교육과정 품질지표';
+        compareSub.textContent = '교육만족도 / 강사 만족도 / 실무적용체감도';
+      }
+      modeChip.textContent = dashboardModeText[state.currentDashboardTab];
+      lineLegend(lineSeries, mainLegend);
+      lineLegend(barSeries, compareLegend);
+      drawLine(lineSeries, lineMax, lineUnit);
+      drawBars(barSeries, barMax, barUnit);
+    }
+
+    function judgeAgainstTarget(current, target) {
+      if (!target && target !== 0) return ['목표없음', 'mid'];
+      const ratio = target ? (current / target) : 1;
+      if (ratio >= 1) return ['달성', 'good'];
+      if (ratio >= 0.85) return ['점검필요', 'mid'];
+      return ['집중관리', 'bad'];
+    }
+
+    function renderPriorityAndGauges() {
+      const a = annual(state.currentYear);
+      const targetMap = getTargetMap(state.currentYear);
+      const keys = getMetricKeysByTab(state.currentDashboardTab);
+      const rows = keys.map(key => {
+        const label = metricCatalog[key].label;
+        const targetRow = targetMap[label];
+        const target = targetRow ? n(targetRow.target) : null;
+        return { key, label, value: a[key] || 0, display: formatMetricValue(key, a[key] || 0), target, unit: targetRow ? targetRow.unit : (metricCatalog[key].type === 'score' ? '점' : metricCatalog[key].type === 'count' ? '건' : '%'), judge: judgeAgainstTarget(a[key] || 0, target), color: metricCatalog[key].tone };
+      });
+
+      priorityBody.innerHTML = rows.map(it => `<tr><td>${it.label}</td><td>${it.display}</td><td><span class="badge ${it.judge[1]}">${it.judge[0]}</span></td></tr>`).join('');
+
+      const colorMap = { blue:'#2f6fed', teal:'#16b3c6', green:'#22a06b', orange:'#f59e0b', purple:'#8b5cf6' };
+      gaugeList.innerHTML = rows.map(g => {
+        const max = g.unit === '점' ? 5 : Math.max(g.target || 0, g.value || 0, 1) * 1.2;
+        const currentPct = Math.min((g.value / max) * 100, 100);
+        const targetPct = Math.min(((g.target || 0) / max) * 100, 100);
+        const rate = g.target ? Math.round((g.value / g.target) * 100) : 0;
+        return `<div class="gauge-row">
+          <div class="gauge-meta"><span>${g.label}</span><span>${g.display} / 목표 ${(g.target ?? 0).toFixed(g.unit === '점' ? 1 : 0)}${g.unit} (${rate}%)</span></div>
+          <div class="gauge"><div class="target" style="width:${targetPct}%; background:${colorMap[g.color] || '#2f6fed'}; opacity:.25;"></div><div class="current" style="width:${currentPct}%; background:${colorMap[g.color] || '#2f6fed'};"></div></div>
+        </div>`;
+      }).join('');
+    }
+
+    function displayValue(type, key, row) {
+      const v = row[key];
+      const col = sheetConfig[type].columns.find(c => c.key === key);
+      if (!col) return v ?? '';
+      if (col.type === 'calc-percent') return percent(n(v));
+      if (col.type === 'score') return (v === '' || v === null || v === undefined) ? '' : n(v).toFixed(1);
+      if (col.type === 'number') return v ?? '';
+      return v ?? '';
+    }
+
+    function normalizeSelectedRows(type) {
+      const selected = state.selectedRows[type] || [];
+      state.selectedRows[type] = selected.filter(idx => idx >= 0 && idx < (state.data[type] || []).length);
+    }
+
+    function toggleRowSelection(type, idx, checked) {
+      const set = new Set(state.selectedRows[type] || []);
+      if (checked) set.add(idx);
+      else set.delete(idx);
+      state.selectedRows[type] = Array.from(set).sort((a, b) => a - b);
+      renderSheets();
+    }
+
+    function toggleSelectAll(type, checked) {
+      const len = (state.data[type] || []).length;
+      state.selectedRows[type] = checked ? Array.from({ length: len }, (_, i) => i) : [];
+      renderSheets();
+    }
+
+    function onTargetSelectChange(rowIdx, key, value) {
+      const row = state.data.targets[rowIdx];
+      row[key] = value;
+      syncTargetRow(row);
+      renderAll();
+    }
+
+    function renderSheets() {
+      sheetPanels.innerHTML = '';
+      Object.keys(sheetConfig).forEach(type => {
+        normalizeSelectedRows(type);
+        const cfg = sheetConfig[type];
+        const panel = document.createElement('div');
+        panel.className = `sheet-panel ${type === state.currentSheet ? '' : 'hidden'}`;
+        panel.dataset.sheet = type;
+        const table = document.createElement('table');
+        table.className = 'sheet';
+        const thead = document.createElement('thead');
+        const htr = document.createElement('tr');
+        const numHead = document.createElement('th');
+        numHead.textContent = '#';
+        numHead.style.width = '44px';
+        htr.appendChild(numHead);
+        const checkHead = document.createElement('th');
+        checkHead.className = 'row-check';
+        const allCheck = document.createElement('input');
+        allCheck.type = 'checkbox';
+        const rowCount = (state.data[type] || []).length;
+        const selectedCount = (state.selectedRows[type] || []).length;
+        allCheck.checked = rowCount > 0 && selectedCount === rowCount;
+        allCheck.indeterminate = selectedCount > 0 && selectedCount < rowCount;
+        allCheck.addEventListener('change', () => toggleSelectAll(type, allCheck.checked));
+        checkHead.appendChild(allCheck);
+        htr.appendChild(checkHead);
+        cfg.columns.forEach(col => {
+          const th = document.createElement('th');
+          th.textContent = col.label;
+          htr.appendChild(th);
+        });
+        thead.appendChild(htr);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        state.data[type].forEach((row, idx) => {
+          calcRow(type, row);
+          const tr = document.createElement('tr');
+          const isSelected = (state.selectedRows[type] || []).includes(idx);
+          tr.classList.toggle('selected-row', isSelected);
+          const rn = document.createElement('td');
+          rn.className = 'row-num';
+          rn.textContent = idx + 1;
+          tr.appendChild(rn);
+          const ck = document.createElement('td');
+          ck.className = 'row-check';
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = isSelected;
+          checkbox.addEventListener('change', () => toggleRowSelection(type, idx, checkbox.checked));
+          ck.appendChild(checkbox);
+          tr.appendChild(ck);
+
+          cfg.columns.forEach(col => {
+            const td = document.createElement('td');
+            const isTargetCategory = type === 'targets' && col.key === 'category';
+            const isTargetKpi = type === 'targets' && col.key === 'kpi';
+            const isTargetUnit = type === 'targets' && col.key === 'unit';
+            td.className = `${(col.editable && !isTargetUnit) ? 'input' : 'calc'} ${col.align === 'left' ? 'text-left' : ''}`;
+
+            if (isTargetCategory || isTargetKpi) {
+              const select = document.createElement('select');
+              select.className = 'sheet-select';
+              select.dataset.row = idx;
+              select.dataset.key = col.key;
+              const options = isTargetCategory ? getTargetCategoryOptions().map(label => ({ label, value: label })) : getTargetKpiList(row.category).map(item => ({ label: item.kpi, value: item.kpi }));
+              options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                option.selected = String(opt.value) === String(row[col.key] ?? '');
+                select.appendChild(option);
+              });
+              select.addEventListener('change', (e) => onTargetSelectChange(idx, col.key, e.target.value));
+              td.appendChild(select);
+            } else if (isTargetUnit) {
+              const unitDiv = document.createElement('div');
+              unitDiv.className = 'cell';
+              unitDiv.contentEditable = 'false';
+              unitDiv.textContent = displayValue(type, col.key, row);
+              td.appendChild(unitDiv);
+            } else {
+              const div = document.createElement('div');
+              div.className = 'cell';
+              div.contentEditable = col.editable ? 'true' : 'false';
+              div.dataset.sheet = type;
+              div.dataset.row = idx;
+              div.dataset.key = col.key;
+              div.textContent = displayValue(type, col.key, row);
+              if (col.editable) {
+                div.addEventListener('blur', onCellEdit);
+                div.addEventListener('keydown', (e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); div.blur(); }
+                });
+              }
+              td.appendChild(div);
+            }
+            tr.appendChild(td);
+          });
+
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        const wrap = document.createElement('div');
+        wrap.className = 'sheet-wrap';
+        wrap.appendChild(table);
+        panel.appendChild(wrap);
+        sheetPanels.appendChild(panel);
+      });
+      sheetNote.textContent = sheetConfig[state.currentSheet].note;
+    }
+
+    function onCellEdit(e) {
+      const cell = e.currentTarget;
+      const type = cell.dataset.sheet;
+      const rowIdx = Number(cell.dataset.row);
+      const key = cell.dataset.key;
+      const cfg = sheetConfig[type].columns.find(c => c.key === key);
+      let value = cell.textContent.trim();
+      if (cfg.type === 'number' || cfg.type === 'score') value = n(value);
+      state.data[type][rowIdx][key] = value;
+      calcRow(type, state.data[type][rowIdx]);
+      renderAll();
+    }
+
+    function findSheetType(sheetName) {
+      return Object.keys(excelSheetAliases).find(type => (excelSheetAliases[type] || []).includes(sheetName));
+    }
+
+    function exportExcelTemplate() {
+      if (typeof XLSX === 'undefined') {
+        alert('엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결 후 다시 시도해 주세요.');
+        return;
+      }
+      prepareAllRows();
+      const wb = XLSX.utils.book_new();
+      const sheetOrder = ['course', 'learning', 'dx', 'innovation', 'targets'];
+      sheetOrder.forEach(type => {
+        const cfg = sheetConfig[type];
+        const rows = state.data[type] || [];
+        const aoa = [cfg.columns.map(col => col.label)];
+        rows.forEach(row => {
+          calcRow(type, row);
+          aoa.push(cfg.columns.map(col => row[col.key] ?? ''));
+        });
+        if (rows.length === 0) {
+          aoa.push(cfg.columns.map(col => col.type === 'text' ? '' : 0));
+        }
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = cfg.columns.map(col => ({
+          wch: Math.max(12, Math.min(26, String(col.label || '').length + 6))
+        }));
+        XLSX.utils.book_append_sheet(wb, ws, excelSheetAliases[type][0]);
+      });
+
+      const guide = XLSX.utils.aoa_to_sheet([
+        ['디지털L&D센터 KPI 엑셀 업로드/다운로드 안내'],
+        ['1. 입력_교육과정, 입력_학습참여, 입력_DX_AX, 입력_혁신활동, 목표관리 시트를 사용합니다.'],
+        ['2. 운영효율과 교육품질은 입력_교육과정 시트에서 통합 관리합니다.'],
+        ['3. 헤더명은 그대로 유지하고 데이터 행만 수정하세요.'],
+        ['4. 수정 후 이 웹 대시보드의 엑셀 업로드 버튼으로 다시 불러오면 자동 반영됩니다.'],
+        ['5. 계산 컬럼 값은 업로드 후 웹 대시보드에서 다시 계산됩니다.']
+      ]);
+      guide['!cols'] = [{ wch: 110 }];
+      XLSX.utils.book_append_sheet(wb, guide, '사용안내');
+
+      XLSX.writeFile(wb, `디지털L&D센터_KPI_엑셀양식_${state.currentYear}.xlsx`);
+    }
+
+    function importExcelWorkbook(file) {
+      if (!file) return;
+      if (typeof XLSX === 'undefined') {
+        alert('엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결 후 다시 시도해 주세요.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const wb = XLSX.read(evt.target.result, { type: 'array' });
+          const nextData = { ...state.data };
+          let matchedCount = 0;
+          wb.SheetNames.forEach(sheetName => {
+            const type = findSheetType(sheetName);
+            if (!type) return;
+            const cfg = sheetConfig[type];
+            const ws = wb.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            if (!rows.length) {
+              nextData[type] = [];
+              matchedCount += 1;
+              return;
+            }
+            const header = rows[0].map(v => String(v).trim());
+            const body = rows.slice(1);
+            const parsed = body.map(r => {
+              const obj = {};
+              cfg.columns.forEach(col => {
+                const idx = header.indexOf(col.label);
+                if (idx === -1) return;
+                const raw = r[idx];
+                if (col.type === 'number' || col.type === 'score' || col.type === 'calc-percent') {
+                  obj[col.key] = n(raw);
+                } else {
+                  obj[col.key] = raw ?? '';
+                }
+              });
+              return obj;
+            }).filter(obj => Object.values(obj).some(v => String(v ?? '').trim() !== '' && String(v ?? '').trim() !== '0'));
+            nextData[type] = parsed;
+            matchedCount += 1;
+          });
+
+          if (!matchedCount) {
+            alert('인식 가능한 시트를 찾지 못했습니다. 이 화면에서 다운로드한 엑셀 양식을 사용해 주세요.');
+            return;
+          }
+
+          state.data = nextData;
+          state.selectedRows = createEmptySelections();
+          prepareAllRows();
+          const years = getYears();
+          if (years.length) state.currentYear = years[0];
+          renderAll();
+          alert(`엑셀 업로드가 완료되었습니다. (${matchedCount}개 시트 반영)`);
+        } catch (err) {
+          console.error(err);
+          alert('엑셀 파일을 읽는 중 오류가 발생했습니다. 파일 형식과 시트명을 확인해 주세요.');
+        } finally {
+          excelFileInput.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function deleteSelectedRows() {
+      const type = state.currentSheet;
+      const selected = (state.selectedRows[type] || []).slice().sort((a, b) => b - a);
+      if (!selected.length) {
+        alert('삭제할 행을 먼저 선택해 주세요.');
+        return;
+      }
+      state.data[type] = (state.data[type] || []).filter((_, idx) => !selected.includes(idx));
+      state.selectedRows[type] = [];
+      renderAll();
+    }
+
+    function addRow() {
+      const type = state.currentSheet;
+      const year = state.currentYear;
+      const defaults = {
+        course: {year, month:1, course:'', planned:0, actual:0, applicants:0, attendees:0, respondents:0, satisfaction:0, instructor:0, practical:0},
+        learning: {year, month:1, total:0, budget:0, used:0, offline:0, online:0},
+        dx: {year, month:1, total:0, digital:0, genaiUsers:0, devBudget:0, genaiSpend:0, leaders:0},
+        innovation: {year, month:1, activity:'', innovation:0},
+        targets: {year, category:'교육과정', kpi:'교육 실시율', unit:'%', target:0}
+      };
+      state.data[type].push(defaults[type]);
+      calcRow(type, state.data[type][state.data[type].length - 1]);
+      renderAll();
+    }
+
+    function switchMainView(view) {
+      state.currentView = view;
+      document.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
+      document.getElementById('dashboardView').classList.toggle('hidden', view !== 'dashboard');
+      document.getElementById('sheetsView').classList.toggle('hidden', view !== 'sheets');
+    }
+
+    function switchSheet(type) {
+      state.currentSheet = type;
+      document.querySelectorAll('.subtab').forEach(btn => btn.classList.toggle('active', btn.dataset.sheet === type));
+      document.querySelectorAll('.sheet-panel').forEach(panel => panel.classList.toggle('hidden', panel.dataset.sheet !== type));
+      sheetNote.textContent = sheetConfig[type].note;
+    }
+
+    function applyDashboardTheme() {
+      const view = document.getElementById('dashboardView');
+      view.classList.remove('theme-all', 'theme-course', 'theme-learning', 'theme-dx', 'theme-innovation');
+      view.classList.add(`theme-${state.currentDashboardTab}`);
+      document.getElementById('dashboardModeChip').textContent = dashboardModeText[state.currentDashboardTab];
+    }
+
+    function switchDashboardTab(type) {
+      state.currentDashboardTab = type;
+      applyDashboardTheme();
+      document.querySelectorAll('.dash-filter').forEach(btn => btn.classList.toggle('active', btn.dataset.dash === type));
+      renderKpis();
+      renderDefinitions();
+      renderCharts();
+      renderPriorityAndGauges();
+    }
+
+    function renderAll() {
+      prepareAllRows();
+      renderYearOptions();
+      renderKpis();
+      renderDefinitions();
+      renderCharts();
+      renderPriorityAndGauges();
+      renderSheets();
+      switchMainView(state.currentView);
+      switchSheet(state.currentSheet);
+      applyDashboardTheme();
+      document.querySelectorAll('.dash-filter').forEach(btn => btn.classList.toggle('active', btn.dataset.dash === state.currentDashboardTab));
+      persistState();
+    }
+
+    document.querySelectorAll('.tab').forEach(btn => btn.addEventListener('click', () => switchMainView(btn.dataset.view)));
+    document.querySelectorAll('.subtab').forEach(btn => btn.addEventListener('click', () => switchSheet(btn.dataset.sheet)));
+    document.querySelectorAll('.dash-filter').forEach(btn => btn.addEventListener('click', () => switchDashboardTab(btn.dataset.dash)));
+    document.getElementById('addRowBtn').addEventListener('click', addRow);
+    document.getElementById('deleteRowBtn').addEventListener('click', deleteSelectedRows);
+    document.getElementById('uploadExcelBtn').addEventListener('click', () => excelFileInput.click());
+    document.getElementById('downloadExcelBtn').addEventListener('click', exportExcelTemplate);
+    excelFileInput.addEventListener('change', (e) => importExcelWorkbook(e.target.files[0]));
+    document.getElementById('recalcBtn').addEventListener('click', renderAll);
+    yearSelect.addEventListener('change', () => { state.currentYear = Number(yearSelect.value); renderAll(); });
+
+    loadPersistedState();
+    renderAll();
